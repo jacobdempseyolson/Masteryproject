@@ -1,0 +1,348 @@
+
+--Users Table Queries
+--User Demographics (Gender & Marital Status Distribution):
+
+ SELECT 
+   gender, 
+   married, 
+   COUNT(*) AS user_count 
+FROM Users
+GROUP BY gender, married;
+
+
+--User Ages:
+
+ SELECT 
+   user_id, 
+   birthdate, 
+   EXTRACT(YEAR FROM AGE(birthdate)) AS age
+FROM Users
+WHERE birthdate <= CURRENT_DATE;
+
+
+--Sign-Up Trends:
+
+ SELECT 
+   DATE_TRUNC('month', sign_up_date) AS sign_up_month, 
+   COUNT(*) AS sign_ups
+FROM Users
+GROUP BY DATE_TRUNC('month', sign_up_date)
+ORDER BY sign_up_month;
+
+
+Data Quality Check (Missing Latitude/Longitude Values):
+
+ SELECT 
+   user_id, 
+   home_airport, 
+   home_airport_lat, 
+   home_airport_lon
+FROM Users
+WHERE (home_airport_lat IS NULL AND home_airport_lon IS NOT NULL)
+   OR (home_airport_lon IS NULL AND home_airport_lat IS NOT NULL);
+
+
+
+--Sessions Table Queries
+--Session Durations:
+
+ SELECT 
+   session_id, 
+   user_id, 
+   session_start, 
+   session_end, 
+   (session_end - session_start) AS duration
+FROM Sessions
+WHERE session_end >= session_start;
+
+
+--Average Discounts and Bookings:
+
+ SELECT 
+   AVG(flight_discount) AS avg_flight_discount, 
+   AVG(hotel_discount) AS avg_hotel_discount, 
+   SUM(flight_booked::int) AS total_flights_booked, 
+   SUM(hotel_booked::int) AS total_hotels_booked
+FROM Sessions;
+
+
+--Data Quality Check (Sessions with No Matching User):
+
+ SELECT s.*
+FROM Sessions s
+LEFT JOIN Users u ON s.user_id = u.user_id
+WHERE u.user_id IS NULL;
+
+
+--Data Quality Check (Sessions with Negative Durations):
+
+ SELECT *
+FROM Sessions
+WHERE session_end < session_start;
+
+
+
+--Flights Table Queries
+--Popular Airlines:
+
+ SELECT 
+   trip_airline, 
+   COUNT(*) AS total_flights
+FROM Flights
+GROUP BY trip_airline
+ORDER BY total_flights DESC
+LIMIT 10;
+
+
+--Flight Fare Analysis:
+
+ SELECT 
+   origin_airport, 
+   destination_airport, 
+   AVG(base_fare_usd) AS avg_fare
+FROM Flights
+GROUP BY origin_airport, destination_airport
+ORDER BY avg_fare DESC;
+
+
+--Seasonal Price Variability:
+
+ SELECT 
+   EXTRACT(QUARTER FROM departure_time) AS quarter, 
+   AVG(base_fare_usd) AS avg_fare
+FROM Flights
+GROUP BY quarter
+ORDER BY quarter;
+
+
+--Data Quality Check (Invalid Seat Counts):
+
+ SELECT *
+FROM Flights
+WHERE seats <= 0 OR seats > 600;
+
+
+--Data Quality Check (Return Time Before Departure Time):
+
+ SELECT *
+FROM Flights
+WHERE return_time < departure_time;
+
+
+
+--Hotels Table Queries
+--Popular Hotels:
+
+ SELECT 
+   hotel_name, 
+   COUNT(*) AS total_bookings, 
+   AVG(nights) AS avg_nights, 
+   AVG(hotel_per_room_usd) AS avg_price_per_room
+FROM Hotels
+GROUP BY hotel_name
+ORDER BY total_bookings DESC
+LIMIT 10;
+
+
+--High-Value Hotels:
+
+ SELECT 
+   hotel_name, 
+   AVG(hotel_per_room_usd) AS avg_price
+FROM Hotels
+GROUP BY hotel_name
+ORDER BY avg_price DESC
+LIMIT 10;
+
+
+--Data Quality Check (Invalid Nights or Rooms):
+
+ SELECT *
+FROM Hotels
+WHERE nights <= 0 OR rooms <= 0;
+
+
+--Data Quality Check (Check-out Before Check-in):
+
+ SELECT *
+FROM Hotels
+WHERE check_out_time < check_in_time;
+
+
+
+--Cross-Table Analysis Queries
+--Sessions and Flights/Hotels Mismatch:
+
+ SELECT s.session_id, s.trip_id
+FROM Sessions s
+LEFT JOIN Flights f ON s.trip_id = f.trip_id
+LEFT JOIN Hotels h ON s.trip_id = h.trip_id
+WHERE f.trip_id IS NULL AND h.trip_id IS NULL;
+
+
+--Users with No Sessions:
+
+ SELECT u.user_id
+FROM Users u
+LEFT JOIN Sessions s ON u.user_id = s.user_id
+WHERE s.user_id IS NULL;
+
+
+
+--Cleaning Steps Queries
+--Replace NULL Flight Discounts with 0:
+
+ UPDATE Sessions
+SET flight_discount = 0
+WHERE flight_discount IS NULL;
+
+
+--Replace Missing Airport Latitude/Longitude Values with Defaults:
+
+ UPDATE Users
+SET home_airport_lat = 0, home_airport_lon = 0
+WHERE home_airport_lat IS NULL OR home_airport_lon IS NULL;
+
+
+--Remove Duplicate Users (Keep Latest Record):
+
+ DELETE FROM Users
+WHERE user_id IN (
+   SELECT user_id
+   FROM (
+      SELECT user_id, ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY sign_up_date DESC) AS row_num
+      FROM Users
+   ) t
+   WHERE row_num > 1
+);
+
+
+
+--Feature Engineering Queries
+--Age Group:
+
+ CASE
+    WHEN age BETWEEN 13 AND 19 THEN 'Teenager'
+    WHEN age BETWEEN 20 AND 35 THEN 'Young Adult'
+    WHEN age BETWEEN 36 AND 50 THEN 'Middle-Aged'
+    ELSE 'Senior'
+END AS age_group
+
+
+--Family-Oriented Customers:
+
+ CASE
+    WHEN has_children = TRUE THEN 'Family Traveler'
+    ELSE 'Solo Traveler'
+END AS traveler_type
+
+
+--Frequent Signup Cohorts:
+
+ DATE_TRUNC('month', sign_up_date) AS signup_month
+
+
+--Home Base Region:
+
+ SELECT home_country, COUNT(*) AS user_count
+FROM Users
+GROUP BY home_country;
+
+
+--Airport Proximity Segment:
+
+ SELECT 
+   user_id, 
+   home_airport, 
+   ST_Distance(ST_Point(home_airport_lat, home_airport_lon), <reference airport coordinates>) AS distance_to_airport
+FROM Users;
+
+
+--Average Session Duration:
+
+ SELECT 
+   user_id, 
+   AVG(session_end - session_start) AS avg_session_duration
+FROM Sessions
+GROUP BY user_id;
+
+
+--Booking Ratios:
+
+ SELECT 
+   user_id, 
+   SUM(CASE WHEN flight_booked = TRUE OR hotel_booked = TRUE THEN 1 ELSE 0 END)::float / COUNT(session_id) AS booking_ratio
+FROM Sessions
+GROUP BY user_id;
+
+
+--Preferred Airlines:
+
+ SELECT 
+   user_id, 
+   trip_airline, 
+   COUNT(*) AS airline_usage
+FROM Flights
+GROUP BY user_id, trip_airline
+ORDER BY user_id, airline_usage DESC;
+
+
+--Seat Booking Patterns:
+
+ SELECT 
+   user_id, 
+   AVG(seats) AS avg_seats_booked
+FROM Flights
+GROUP BY user_id;
+
+
+--Average Flight Fare:
+
+ SELECT 
+   user_id, 
+   AVG(base_fare_usd) AS avg_flight_fare
+FROM Flights
+GROUP BY user_id;
+
+
+--Average Hotel Spend per Room:
+
+ SELECT 
+   user_id, 
+   AVG(hotel_per_room_usd) AS avg_hotel_spend
+FROM Hotels
+GROUP BY user_id;
+
+
+--Lifetime Value (LTV):
+
+ SELECT 
+   u.user_id, 
+   COALESCE(SUM(f.base_fare_usd), 0) + COALESCE(SUM(h.hotel_per_room_usd * h.rooms * h.nights), 0) AS lifetime_value
+FROM Users u
+LEFT JOIN Flights f ON u.user_id = f.user_id
+LEFT JOIN Hotels h ON u.user_id = h.user_id
+GROUP BY u.user_id;
+
+
+--Travel Frequency:
+
+ SELECT 
+   user_id, 
+   COUNT(DISTINCT trip_id) AS total_trips
+FROM (
+    SELECT user_id, trip_id FROM Flights
+    UNION
+    SELECT user_id, trip_id FROM Hotels
+) trips
+GROUP BY user_id;
+
+
+--Customer Engagement Score:
+
+ SELECT 
+   user_id, 
+   (0.3 * booking_ratio) + 
+   (0.4 * total_clicks / MAX(total_clicks) OVER()) + 
+   (0.3 * lifetime_value / MAX(lifetime_value) OVER()) AS engagement_score
+FROM Users;
