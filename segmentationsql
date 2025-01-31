@@ -1,0 +1,63 @@
+-- Step 1: Data Cleaning & Filtering
+-- Ensure only valid sessions are included in the dataset
+WITH cleaned_sessions AS (
+    SELECT 
+        user_id, 
+        session_id, 
+        COUNT(page_clicks) AS total_clicks, 
+        SUM(session_duration) AS total_duration,
+        COUNT(CASE WHEN event_type = 'booking' THEN 1 END) AS bookings,
+        COUNT(CASE WHEN event_type = 'cancellation' THEN 1 END) AS cancellations
+    FROM user_sessions
+    WHERE session_duration > 0 
+        AND page_clicks > 1
+    GROUP BY user_id, session_id
+)
+
+-- Step 2: User-Level Aggregation
+, user_profiles AS (
+    SELECT 
+        user_id,
+        COUNT(session_id) AS total_sessions,
+        AVG(total_duration) AS avg_session_duration,
+        SUM(total_clicks) AS total_page_clicks,
+        SUM(bookings) AS total_bookings,
+        SUM(cancellations) AS total_cancellations
+    FROM cleaned_sessions
+    GROUP BY user_id
+)
+
+-- Step 3: Customer Segmentation
+, user_segments AS (
+    SELECT 
+        user_id,
+        total_sessions,
+        avg_session_duration,
+        total_page_clicks,
+        total_bookings,
+        total_cancellations,
+        CASE 
+            WHEN total_bookings >= 5 THEN 'Frequent Traveler'
+            WHEN total_page_clicks > 50 AND total_bookings < 2 THEN 'Deal-Seeker'
+            WHEN total_cancellations >= 3 THEN 'High-Risk Churn'
+            ELSE 'Casual User'
+        END AS customer_segment
+    FROM user_profiles
+)
+
+-- Step 4: Define KPIs and Assign Rewards
+SELECT 
+    u.user_id,
+    u.customer_segment,
+    u.total_sessions,
+    u.avg_session_duration,
+    u.total_page_clicks,
+    u.total_bookings,
+    u.total_cancellations,
+    CASE 
+        WHEN u.customer_segment = 'Frequent Traveler' THEN '10% discount on next 3 bookings + priority support'
+        WHEN u.customer_segment = 'Deal-Seeker' THEN 'Exclusive early access to upcoming discounts'
+        WHEN u.customer_segment = 'High-Risk Churn' THEN 'Personalized retention offer: Free lounge access or discounted rebooking fee'
+        ELSE 'Standard loyalty program benefits'
+    END AS recommended_rewards
+FROM user_segments u;
