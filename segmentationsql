@@ -1,63 +1,170 @@
--- Step 1: Data Cleaning & Filtering
--- Ensure only valid sessions are included in the dataset
-WITH cleaned_sessions AS (
+WITH User_Details AS (
     SELECT 
-        user_id, 
-        session_id, 
-        COUNT(page_clicks) AS total_clicks, 
-        SUM(session_duration) AS total_duration,
-        COUNT(CASE WHEN event_type = 'booking' THEN 1 END) AS bookings,
-        COUNT(CASE WHEN event_type = 'cancellation' THEN 1 END) AS cancellations
-    FROM user_sessions
-    WHERE session_duration > 0 
-        AND page_clicks > 1
-    GROUP BY user_id, session_id
-)
-
--- Step 2: User-Level Aggregation
-, user_profiles AS (
-    SELECT 
-        user_id,
-        COUNT(session_id) AS total_sessions,
-        AVG(total_duration) AS avg_session_duration,
-        SUM(total_clicks) AS total_page_clicks,
-        SUM(bookings) AS total_bookings,
-        SUM(cancellations) AS total_cancellations
-    FROM cleaned_sessions
-    GROUP BY user_id
-)
-
--- Step 3: Customer Segmentation
-, user_segments AS (
-    SELECT 
-        user_id,
-        total_sessions,
-        avg_session_duration,
-        total_page_clicks,
-        total_bookings,
-        total_cancellations,
+        u.user_id,
+        u.gender,
+        u.married,
+        u.birthdate,
+        EXTRACT(YEAR FROM AGE(u.birthdate)) AS age,
         CASE 
-            WHEN total_bookings >= 5 THEN 'Frequent Traveler'
-            WHEN total_page_clicks > 50 AND total_bookings < 2 THEN 'Deal-Seeker'
-            WHEN total_cancellations >= 3 THEN 'High-Risk Churn'
-            ELSE 'Casual User'
-        END AS customer_segment
-    FROM user_profiles
+            WHEN EXTRACT(YEAR FROM AGE(u.birthdate)) BETWEEN 13 AND 19 THEN 'Teenager'
+            WHEN EXTRACT(YEAR FROM AGE(u.birthdate)) BETWEEN 20 AND 35 THEN 'Young Adult'
+            WHEN EXTRACT(YEAR FROM AGE(u.birthdate)) BETWEEN 36 AND 50 THEN 'Middle-Aged'
+            ELSE 'Senior'
+        END AS age_group,
+        u.sign_up_date,
+        DATE_TRUNC('month', u.sign_up_date) AS signup_month,
+        u.home_country,
+        u.home_city,
+        u.home_airport,
+        u.home_airport_lat,
+        u.home_airport_lon,
+        CASE 
+            WHEN u.home_airport_lat IS NULL OR u.home_airport_lon IS NULL THEN 'Missing Coordinates'
+            ELSE 'Valid'
+        END AS airport_data_quality
+    FROM Users u
+),
+Session_Data AS (
+    SELECT 
+        s.user_id,
+        COUNT(s.session_id) AS total_sessions,
+        MIN(s.session_start) AS first_session,
+        MAX(s.session_end) AS last_session,
+        AVG(EXTRACT(EPOCH FROM (s.session_end - s.session_start))) AS avg_session_duration,
+        SUM(CASE WHEN s.flight_booked = TRUE OR s.hotel_booked = TRUE THEN 1 ELSE 0 END)::float / NULLIF(COUNT(s.session_id), 0) AS booking_ratio,
+        AVG(CASE WHEN s.flight_discount = TRUE THEN 1 ELSE 0 END) AS avg_flight_discount,
+        AVG(CASE WHEN s.hotel_discount = TRUE THEN 1 ELSE 0 END) AS avg_hotel_discount,
+        SUM(s.page_clicks) AS total_page_clicks,
+        SUM(CASE WHEN s.cancellation = TRUE THEN 1 ELSE 0 END) AS total_cancellations
+    FROM Sessions s
+    GROUP BY s.user_id
+),
+Flight_Data AS (
+    SELECT 
+        s.user_id,
+        COUNT(f.trip_id) AS total_flights,
+        AVG(f.base_fare_usd) AS avg_flight_fare,
+        MAX(f.trip_airline) AS preferred_airline,
+        AVG(f.seats) AS avg_seats_booked,
+        SUM(CASE WHEN f.checked_bags > 0 THEN f.checked_bags ELSE 0 END) AS total_checked_bags,
+        AVG(EXTRACT(EPOCH FROM (f.return_time - f.departure_time))) AS avg_trip_duration
+    FROM Flights f
+    JOIN Sessions s ON f.trip_id = s.trip_id
+    GROUP BY s.user_id
+),
+Hotel_Data AS (
+    SELECT 
+        s.user_id,
+        COUNT(h.trip_id) AS total_hotels,
+        AVG(h.hotel_per_room_usd) AS avg_hotel_spend,
+        AVG(h.nights) AS avg_nights_stayed,
+        SUM(h.rooms) AS total_rooms_booked
+    FROM Hotels h
+    JOIN Sessions s ON h.trip_id = s.trip_id
+    GROUP BY s.user_id
+),
+Lifetime_Value AS (
+    SELECT 
+        u.user_id,
+        COALESCE(SUM(f.base_fare_usd), 0) + COALESCE(SUM(COALESCE(h.hotel_per_room_usd,0) * COALESCE(h.rooms,1) * COALESCE(h.nights,1)), 0) AS lifetime_value
+    FROM Users u
+    LEFT JOIN Sessions s ON u.user_id = s.user_id
+    LEFT JOIN Flights f ON s.trip_id = f.trip_id
+    LEFT JOIN Hotels h ON s.trip_id = h.trip_id
+    GROUP BY u.user_id
+),
+Travel_Frequency AS (
+    SELECT 
+        s.user_id,
+        COUNT(DISTINCT s.trip_id) AS total_trips,
+        COUNT(DISTINCT DATE_TRUNC('year', s.session_start)) AS active_years
+    FROM Sessions s
+    GROUP BY s.user_id
+),
+Customer_Engagement AS (
+    SELECT 
+        u.user_id,
+        (0.3 * COALESCE(s.booking_ratio, 0)) + 
+        (0.4 * COALESCE(s.total_sessions, 0) / NULLIF(MAX(s.total_sessions) OVER (), 0)) + 
+        (0.3 * COALESCE(l.lifetime_value, 0) / NULLIF(MAX(l.lifetime_value) OVER (), 0)) AS engagement_score,
+        (COALESCE(s.total_page_clicks, 0) / NULLIF(s.total_sessions, 0)) AS avg_clicks_per_session
+    FROM Users u
+    LEFT JOIN Session_Data s ON u.user_id = s.user_id
+    LEFT JOIN Lifetime_Value l ON u.user_id = l.user_id
+),
+Booking_Segment AS (
+    SELECT 
+        s.user_id,
+        CASE 
+            WHEN s.booking_ratio >= 0.5 THEN 'High Bookers'
+            WHEN s.booking_ratio >= 0.2 THEN 'Medium Bookers'
+            ELSE 'Low Bookers'
+        END AS booking_segment
+    FROM Session_Data s
+),
+Travel_Engagement_Segment AS (
+    SELECT 
+        ce.user_id,
+        CASE 
+            WHEN tf.total_trips >= 10 AND ce.engagement_score >= 0.7 THEN 'Frequent High Engagers'
+            WHEN tf.total_trips >= 5 AND ce.engagement_score >= 0.5 THEN 'Frequent Medium Engagers'
+            ELSE 'Occasional Low Engagers'
+        END AS engagement_segment
+    FROM Travel_Frequency tf
+    JOIN Customer_Engagement ce ON tf.user_id = ce.user_id
 )
-
--- Step 4: Define KPIs and Assign Rewards
 SELECT 
-    u.user_id,
-    u.customer_segment,
-    u.total_sessions,
-    u.avg_session_duration,
-    u.total_page_clicks,
-    u.total_bookings,
-    u.total_cancellations,
-    CASE 
-        WHEN u.customer_segment = 'Frequent Traveler' THEN '10% discount on next 3 bookings + priority support'
-        WHEN u.customer_segment = 'Deal-Seeker' THEN 'Exclusive early access to upcoming discounts'
-        WHEN u.customer_segment = 'High-Risk Churn' THEN 'Personalized retention offer: Free lounge access or discounted rebooking fee'
-        ELSE 'Standard loyalty program benefits'
-    END AS recommended_rewards
-FROM user_segments u;
+    ud.user_id,
+    ud.gender,
+    ud.age_group,
+    ud.home_country,
+    ud.home_city,
+    ud.home_airport,
+    sd.total_sessions,
+    sd.first_session,
+    sd.last_session,
+    sd.avg_session_duration,
+    sd.booking_ratio,
+    sd.avg_flight_discount,
+    sd.avg_hotel_discount,
+    sd.total_page_clicks,
+    sd.total_cancellations,
+    fd.total_flights,
+    fd.avg_flight_fare,
+    fd.preferred_airline,
+    fd.avg_seats_booked,
+    fd.total_checked_bags,
+    fd.avg_trip_duration,
+    hd.total_hotels,
+    hd.avg_hotel_spend,
+    hd.avg_nights_stayed,
+    hd.total_rooms_booked,
+    lv.lifetime_value,
+    tf.total_trips,
+    tf.active_years,
+    ce.engagement_score,
+    ce.avg_clicks_per_session,
+    bs.booking_segment,
+    tes.engagement_segment
+FROM User_Details ud
+LEFT JOIN Session_Data sd ON ud.user_id = sd.user_id
+LEFT JOIN Flight_Data fd ON ud.user_id = fd.user_id
+LEFT JOIN Hotel_Data hd ON ud.user_id = hd.user_id
+LEFT JOIN Lifetime_Value lv ON ud.user_id = lv.user_id
+LEFT JOIN Travel_Frequency tf ON ud.user_id = tf.user_id
+LEFT JOIN Customer_Engagement ce ON ud.user_id = ce.user_id
+LEFT JOIN Booking_Segment bs ON ud.user_id = bs.user_id
+LEFT JOIN Travel_Engagement_Segment tes ON ud.user_id = tes.user_id
+WHERE 
+    ud.user_id IS NOT NULL AND
+    sd.total_sessions IS NOT NULL AND
+    fd.total_flights IS NOT NULL AND
+    hd.total_hotels IS NOT NULL AND
+    lv.lifetime_value IS NOT NULL AND
+    tf.total_trips IS NOT NULL AND
+    ce.engagement_score IS NOT NULL;
+
+
+
+
+
