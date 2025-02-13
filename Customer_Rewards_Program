@@ -1,0 +1,211 @@
+WITH Haversine_Distance AS (
+    -- Calculates the distance (in kilometers) between users' home airport and destination airport
+    -- using the Haversine formula.
+    SELECT 
+        s.user_id,
+        f.trip_id,
+        2 * 6371 * 
+        ASIN(
+            SQRT(
+                POWER(SIN(RADIANS(f.destination_airport_lat - u.home_airport_lat) / 2), 2) +
+                COS(RADIANS(u.home_airport_lat)) * COS(RADIANS(f.destination_airport_lat)) *
+                POWER(SIN(RADIANS(f.destination_airport_lon - u.home_airport_lon) / 2), 2)
+            )
+        ) AS distance_km
+    FROM users u
+    JOIN sessions s ON u.user_id = s.user_id
+    JOIN flights f ON s.trip_id = f.trip_id
+),
+User_Details AS (
+    -- Collects demographic and personal information about users, including age, marital status, 
+    -- number of children, and their geographical location. Also classifies users into age groups 
+    -- and segments (Urban, Suburban, Rural, Unclassified) based on their city.
+    SELECT 
+        u.user_id,
+        u.gender,
+        u.married,
+        u.has_children,
+        u.birthdate,
+        EXTRACT(YEAR FROM AGE(u.birthdate)) AS age,
+        CASE 
+            WHEN EXTRACT(YEAR FROM AGE(u.birthdate)) BETWEEN 13 AND 19 THEN 'Teenager'
+            WHEN EXTRACT(YEAR FROM AGE(u.birthdate)) BETWEEN 20 AND 35 THEN 'Young Adult'
+            WHEN EXTRACT(YEAR FROM AGE(u.birthdate)) BETWEEN 36 AND 50 THEN 'Middle-Aged'
+            ELSE 'Senior'
+        END AS age_group,
+        u.sign_up_date,
+        DATE_TRUNC('month', u.sign_up_date) AS signup_month,
+        u.home_country,
+        u.home_city,
+        u.home_airport,
+        u.home_airport_lat,
+        u.home_airport_lon,
+        CASE 
+            WHEN LOWER(u.home_city) IN (...) THEN 'Urban'
+            WHEN LOWER(u.home_city) IN (...) THEN 'Suburban'
+            WHEN LOWER(u.home_city) IN (...) THEN 'Rural'
+            ELSE 'Unclassified'
+        END AS customer_segment
+    FROM users u
+),
+Filtered_Sessions AS (
+    -- Filters out users who have had less than 8 sessions since January 4, 2023.
+    SELECT 
+        s.user_id,
+        COUNT(s.session_id) AS total_sessions
+    FROM sessions s
+    WHERE s.session_start >= '2023-01-04'
+    GROUP BY s.user_id
+    HAVING COUNT(s.session_id) > 7
+),
+Flight_Hotel_Data AS (
+    -- Aggregates data on users' flight and hotel activities, such as the number of flights,
+    -- the number of hotels booked, average nights stayed, and other trip-related metrics.
+    SELECT 
+        s.user_id,
+        COUNT(DISTINCT f.trip_id) AS total_flights,
+        COUNT(DISTINCT h.trip_id) AS total_hotels,
+        AVG(h.nights) AS avg_nights_stayed,
+        AVG(h.rooms) AS avg_rooms_booked,
+        COUNT(CASE WHEN f.return_flight_booked THEN 1 END) AS total_return_flights,
+        COUNT(CASE WHEN h.trip_id IS NULL THEN 1 END) AS no_hotel_trips,
+        COALESCE(SUM(h.nights * h.rooms), 0) AS total_night_rooms,
+        AVG(EXTRACT(EPOCH FROM (f.return_time - f.departure_time))) / (60 * 60 * 24) AS avg_trip_duration_days
+    FROM sessions s
+    JOIN Filtered_Sessions fs ON s.user_id = fs.user_id
+    LEFT JOIN flights f ON s.trip_id = f.trip_id
+    LEFT JOIN hotels h ON s.trip_id = h.trip_id
+    WHERE s.session_start >= '2023-01-04'
+    GROUP BY s.user_id
+),
+Travel_Frequency AS (
+    -- Determines the number of trips taken by users and how many active years they have been traveling,
+    -- based on their session history.
+    SELECT 
+        s.user_id,
+        COUNT(DISTINCT s.trip_id) AS total_trips,
+        COUNT(DISTINCT DATE_TRUNC('year', s.session_start)) AS active_years
+    FROM sessions s
+    JOIN Filtered_Sessions fs ON s.user_id = fs.user_id
+    WHERE s.session_start >= '2023-01-04'
+    GROUP BY s.user_id
+),
+Customer_Segmentation AS (
+    -- Segments users into categories (e.g., Family Traveler, Business Traveler, Dreamer, etc.)
+    -- based on their travel and spending behaviors, using metrics like the number of flights, hotels,
+    -- and the type of trips taken.
+    SELECT 
+        fh.user_id,
+        CASE 
+            WHEN ud.has_children = TRUE 
+                 AND fh.total_hotels > 0 
+                 AND fh.avg_rooms_booked > 1 
+                 AND fh.avg_nights_stayed > (SELECT AVG(avg_nights_stayed) FROM Flight_Hotel_Data) 
+                 THEN 'Family Traveler'
+            WHEN fh.avg_trip_duration_days <= 3 
+                 AND fh.no_hotel_trips > 0 
+                 AND tf.total_trips / NULLIF(tf.active_years, 0) > 4 
+                 THEN 'Business Traveler'
+            WHEN tf.total_trips > 10 
+                 AND fh.total_hotels = 0 
+                 AND fh.total_flights = 0 
+                 THEN 'Dreamer'
+            WHEN tf.total_trips < 5
+                 AND ud.married = FALSE 
+                 AND EXTRACT(YEAR FROM AGE(ud.birthdate)) < 35 
+                 AND ud.has_children = FALSE 
+                 THEN 'Young Single'
+            ELSE 'Other Traveler'
+        END AS customer_type
+    FROM User_Details ud
+    JOIN Filtered_Sessions fs ON ud.user_id = fs.user_id
+    JOIN Flight_Hotel_Data fh ON ud.user_id = fh.user_id
+    JOIN Travel_Frequency tf ON ud.user_id = tf.user_id
+),
+Customer_Spending AS (
+    -- Calculates total spending for each user, including both flight and hotel spending.
+    SELECT 
+        s.user_id,
+        COALESCE(SUM(f.base_fare_usd), 0) + COALESCE(SUM(h.hotel_per_room_usd * h.nights * h.rooms), 0) AS total_spending
+    FROM sessions s
+    INNER JOIN flights f ON s.trip_id = f.trip_id
+    INNER JOIN hotels h ON s.trip_id = h.trip_id
+    WHERE s.session_start >= '2023-01-04'
+    GROUP BY s.user_id
+),
+Average_Spending AS (
+    -- Calculates the average spending for each customer type.
+    SELECT 
+        customer_type,
+        AVG(total_spending) AS avg_spending
+    FROM Customer_Spending cs
+    INNER JOIN Customer_Segmentation cs2 ON cs.user_id = cs2.user_id
+    GROUP BY customer_type
+),
+Customer_Status AS (
+    -- Assigns a "Gold", "Silver", or "Bronze" status to each user based on their total spending compared 
+    -- to the average spending for their customer type.
+    SELECT 
+        cs.user_id,
+        cs2.customer_type,
+        cs.total_spending,
+        CASE 
+            WHEN cs.total_spending >= avg.avg_spending * 1.5 THEN 'Gold'
+            WHEN cs.total_spending >= avg.avg_spending THEN 'Silver'
+            ELSE 'Bronze'
+        END AS status
+    FROM Customer_Spending cs
+    INNER JOIN Customer_Segmentation cs2 ON cs.user_id = cs2.user_id
+    INNER JOIN Average_Spending avg ON cs2.customer_type = avg.customer_type
+),
+Rewards_Allocation AS (
+    -- Allocates specific rewards (perks) to each user based on their customer type and status.
+    SELECT 
+        cs.user_id,
+        cs2.customer_type,
+        cs.status,
+        CASE 
+            WHEN cs.status = 'Gold' THEN ARRAY[
+                CASE 
+                    WHEN cs2.customer_type = 'Business Traveler' THEN 'Priority Boarding'
+                    WHEN cs2.customer_type = 'Family Traveler' THEN 'Kids Stay Free'
+                    WHEN cs2.customer_type = 'Dreamers' THEN 'First Booking Discount'
+                    WHEN cs2.customer_type = 'Young Singles' THEN 'Weekend Getaway Bonuses'
+                END,
+                '1 Night Free Hotel with Flight',
+                'Free Checked Bags'
+            ]
+            WHEN cs.status = 'Silver' THEN ARRAY[
+                CASE 
+                    WHEN cs2.customer_type = 'Business Traveler' THEN 'Priority Boarding'
+                    WHEN cs2.customer_type = 'Family Traveler' THEN 'Kids Stay Free'
+                    WHEN cs2.customer_type = 'Dreamers' THEN 'First Booking Discount'
+                END,
+                '1 Night Free Hotel with Flight'
+            ]
+            ELSE ARRAY[
+                CASE 
+                    WHEN cs2.customer_type = 'Business Traveler' THEN 'Priority Boarding'
+                    WHEN cs2.customer_type = 'Family Traveler' THEN 'Kids Stay Free'
+                    WHEN cs2.customer_type = 'Dreamers' THEN 'First Booking Discount'
+                END
+            ]
+        END AS perks
+    FROM Customer_Status cs
+    INNER JOIN Customer_Segmentation cs2 ON cs.user_id = cs2.user_id
+)
+SELECT DISTINCT
+    ud.*, 
+    fh.*, 
+    tf.*, 
+    cs2.customer_type,
+    cs_status.status,
+    ra.perks
+FROM User_Details ud
+JOIN Filtered_Sessions fs ON ud.user_id = fs.user_id
+JOIN Flight_Hotel_Data fh ON ud.user_id = fh.user_id
+JOIN Travel_Frequency tf ON ud.user_id = tf.user_id
+JOIN Customer_Segmentation cs2 ON ud.user_id = cs2.user_id
+JOIN Customer_Status cs_status ON ud.user_id = cs_status.user_id
+JOIN Rewards_Allocation ra ON ud.user_id = ra.user_id
+ORDER BY cs2.customer_type, cs_status.status DESC, ud.user_id;
