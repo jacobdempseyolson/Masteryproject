@@ -1,0 +1,161 @@
+-- Step 1: Calculate the haversine distance between the user's home airport and the destination airport
+WITH Haversine_Distance AS (
+    SELECT 
+        s.user_id,
+        f.trip_id,
+        -- Calculate the great-circle distance using the haversine formula
+        2 * 6371 * 
+        ASIN(
+            SQRT(
+                POWER(SIN(RADIANS(f.destination_airport_lat - u.home_airport_lat) / 2), 2) +
+                COS(RADIANS(u.home_airport_lat)) * COS(RADIANS(f.destination_airport_lat)) *
+                POWER(SIN(RADIANS(f.destination_airport_lon - u.home_airport_lon) / 2), 2)
+            )
+        ) AS distance_km
+    FROM users u
+    JOIN sessions s ON u.user_id = s.user_id
+    JOIN flights f ON s.trip_id = f.trip_id
+),
+
+-- Step 2: Extract and categorize user details
+User_Details AS (
+    SELECT 
+        u.user_id,
+        u.gender,
+        u.married,
+        u.has_children,
+        u.birthdate,
+        -- Calculate the user's age and group them into age categories
+        EXTRACT(YEAR FROM AGE(u.birthdate)) AS age,
+        CASE 
+            WHEN EXTRACT(YEAR FROM AGE(u.birthdate)) BETWEEN 13 AND 19 THEN 'Teenager'
+            WHEN EXTRACT(YEAR FROM AGE(u.birthdate)) BETWEEN 20 AND 35 THEN 'Young Adult'
+            WHEN EXTRACT(YEAR FROM AGE(u.birthdate)) BETWEEN 36 AND 50 THEN 'Middle-Aged'
+            ELSE 'Senior'
+        END AS age_group,
+        u.sign_up_date,
+        DATE_TRUNC('month', u.sign_up_date) AS signup_month, -- Month of user sign-up
+        u.home_country,
+        u.home_city,
+        u.home_airport,
+        u.home_airport_lat,
+        u.home_airport_lon,
+        -- Classify the user's home city into Urban, Suburban, Rural, or Unclassified
+        CASE 
+            WHEN LOWER(u.home_city) IN (
+                'akron', 'anchorage', 'atlanta', 'austin', 'baltimore', 'boston', 'calgary', 'charlotte', 
+                'chicago', 'cincinnati', 'cleveland', 'columbus', 'dallas', 'denver', 'detroit', 'edmonton', 
+                'fort worth', 'fresno', 'honolulu', 'houston', 'indianapolis', 'jacksonville', 'kansas city', 
+                'las vegas', 'los angeles', 'louisville', 'memphis', 'miami', 'milwaukee', 'minneapolis', 
+                'montreal', 'nashville', 'new orleans', 'new york', 'newark', 'oakland', 'oklahoma city', 
+                'orlando', 'ottawa', 'philadelphia', 'phoenix', 'portland', 'providence', 'quebec', 'richmond', 
+                'sacramento', 'salt lake city', 'san antonio', 'san diego', 'san francisco', 'san jose', 
+                'seattle', 'tampa', 'toronto', 'vancouver', 'washington'
+            ) THEN 'Urban'
+            WHEN LOWER(u.home_city) IN (
+                'amarillo', 'bakersfield', 'baton rouge', 'birmingham', 'buffalo', 'burlington', 'colorado springs', 
+                'corpus christi', 'des moines', 'el paso', 'fayetteville', 'grand rapids', 'halifax', 'hamilton', 
+                'laredo', 'lincoln', 'little rock', 'long beach', 'lubbock', 'madison', 'mobile', 'modesto', 
+                'montgomery', 'newport news', 'norfolk', 'omaha', 'reno', 'riverside', 'rochester', 'shreveport', 
+                'spokane', 'st. louis', 'stockton', 'tacoma', 'tallahassee', 'tucson', 'tulsa', 'victoria', 
+                'wichita', 'windsor', 'winston-salem'
+            ) THEN 'Suburban'
+            WHEN LOWER(u.home_city) IN (
+                'brownsville', 'gatineau', 'saskatoon', 'st. petersburg', 'winnipeg', 'london'
+            ) THEN 'Rural'
+            ELSE 'Unclassified'
+        END AS customer_segment
+    FROM users u
+),
+
+-- Step 3: Filter users with more than 7 sessions since the specified date
+Filtered_Sessions AS (
+    SELECT 
+        s.user_id,
+        COUNT(s.session_id) AS total_sessions
+    FROM sessions s
+    WHERE s.session_start >= '2023-01-04' -- Include sessions after this date
+    GROUP BY s.user_id
+    HAVING COUNT(s.session_id) > 7 -- Filter users with more than 7 sessions
+),
+
+-- Step 4: Aggregate flight and hotel data for users
+Flight_Hotel_Data AS (
+    SELECT 
+        s.user_id,
+        COUNT(DISTINCT f.trip_id) AS total_flights,
+        COUNT(DISTINCT h.trip_id) AS total_hotels,
+        AVG(h.nights) AS avg_nights_stayed, -- Average nights stayed in hotels
+        AVG(h.rooms) AS avg_rooms_booked, -- Average rooms booked
+        COUNT(CASE WHEN f.return_flight_booked THEN 1 END) AS total_return_flights,
+        COUNT(CASE WHEN h.trip_id IS NULL THEN 1 END) AS no_hotel_trips,
+        COALESCE(SUM(h.nights * h.rooms), 0) AS total_night_rooms, -- Total room-nights booked
+        AVG(EXTRACT(EPOCH FROM (f.return_time - f.departure_time))) / (60 * 60 * 24) AS avg_trip_duration_days
+    FROM sessions s
+    JOIN Filtered_Sessions fs ON s.user_id = fs.user_id
+    LEFT JOIN flights f ON s.trip_id = f.trip_id
+    LEFT JOIN hotels h ON s.trip_id = h.trip_id
+    WHERE s.session_start >= '2023-01-04'
+    GROUP BY s.user_id
+),
+
+-- Step 5: Calculate travel frequency and active years for users
+Travel_Frequency AS (
+    SELECT 
+        s.user_id,
+        COUNT(DISTINCT s.trip_id) AS total_trips,
+        COUNT(DISTINCT DATE_TRUNC('year', s.session_start)) AS active_years
+    FROM sessions s
+    JOIN Filtered_Sessions fs ON s.user_id = fs.user_id
+    WHERE s.session_start >= '2023-01-04'
+    GROUP BY s.user_id
+),
+
+-- Step 6: Segment customers based on their travel and demographic data
+Customer_Segmentation AS (
+    SELECT 
+        fh.user_id,
+        CASE 
+            WHEN ud.has_children = TRUE 
+                 AND fh.total_hotels > 0 
+                 AND fh.avg_rooms_booked > 1 
+                 AND fh.avg_nights_stayed > (SELECT AVG(avg_nights_stayed) FROM Flight_Hotel_Data) 
+                 THEN 'Family Traveler'
+            WHEN fh.avg_trip_duration_days <= 3 
+                 AND fh.no_hotel_trips > 0 
+                 AND tf.total_trips / NULLIF(tf.active_years, 0) > 4 
+                 THEN 'Business Traveler'
+            WHEN tf.total_trips > 10 
+                 AND fh.total_hotels = 0 
+                 AND fh.total_flights = 0 
+                 THEN 'Dreamer'
+            WHEN ud.married = FALSE 
+                 AND EXTRACT(YEAR FROM AGE(ud.birthdate)) < 35 
+                 AND ud.has_children = FALSE 
+                 THEN 'Young Single'
+            ELSE 'Other Traveler'
+        END AS customer_type
+    FROM User_Details ud
+    JOIN Filtered_Sessions fs ON ud.user_id = fs.user_id
+    JOIN Flight_Hotel_Data fh ON ud.user_id = fh.user_id
+    JOIN Travel_Frequency tf ON ud.user_id = tf.user_id
+)
+
+-- Final Step: Combine all data and output the result
+SELECT DISTINCT
+    ud.*, -- User details
+    fh.*, -- Flight and hotel data
+    tf.*, -- Travel frequency data
+    cs.customer_type -- Customer segment
+FROM User_Details ud
+JOIN Filtered_Sessions fs ON ud.user_id = fs.user_id
+JOIN Flight_Hotel_Data fh ON ud.user_id = fh.user_id
+JOIN Travel_Frequency tf ON ud.user_id = tf.user_id
+JOIN Customer_Segmentation cs ON ud.user_id = cs.user_id
+ORDER BY cs.customer_type, tf.total_trips DESC; -- Order by customer type and trip count
+
+
+
+
+
+
