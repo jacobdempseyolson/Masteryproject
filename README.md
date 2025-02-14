@@ -1,6 +1,4 @@
-Here's a more cohesive and formal version aligned with the second style you preferred:  
 
----
 
 # **TravelTide Rewards Program & User Data Analysis**  
 
