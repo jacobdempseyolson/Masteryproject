@@ -1,123 +1,130 @@
-# User Data Analysis
+Here's a more cohesive and formal version aligned with the second style you preferred:  
 
-## Overview
-This project analyzes user behavior, engagement, and travel patterns using structured SQL queries. The analysis helps categorize users based on booking frequency and engagement, providing insights into customer behavior for targeted marketing and business strategies.
+---
 
-## Data Sources
-The dataset consists of multiple tables, each providing specific information about users, their sessions, flights, hotels, and overall engagement:
+# **TravelTide Rewards Program & User Data Analysis**  
 
-- **Users**: Demographics, signup details, and home location.
-- **Sessions**: User interactions, booking activity, and engagement metrics.
-- **Flights**: Travel frequency, preferred airlines, and spending on flights.
-- **Hotels**: Hotel stays, spending, and booking behavior.
-- **Engagement & Segmentation**: Calculating engagement scores and categorizing users into meaningful segments.
+Welcome to the **TravelTide Rewards Program & User Data Analysis** repository. This project leverages advanced data analysis techniques to support the creation of a personalized rewards program while providing deep insights into customer behavior, engagement, and travel patterns. By integrating customer segmentation and SQL-based user analysis, the initiative delivers actionable insights to enhance marketing strategies, improve customer engagement, and drive loyalty.  
 
-## SQL Query Breakdown
-The SQL query consists of several Common Table Expressions (CTEs) to structure the data logically before producing the final report.
+---  
 
-### 1. User_Details
-Extracts user demographic information and categorizes users based on age:
+## **Project Overview**  
 
-- Extracts user ID, gender, marital status, and birthdate.
-- Calculates user age using the birthdate.
-- Classifies users into age groups (Teenager, Young Adult, Middle-Aged, Senior).
-- Extracts signup date and truncates it to the nearest month.
-- Includes home location details, including city, country, and home airport.
-- Checks for missing latitude/longitude in airport data.
+This repository combines two critical initiatives for TravelTide:  
 
-### 2. Session_Data
-Analyzes user session behavior:
+1. **Rewards Program Development**:  
+   - The rewards program focuses on customer segmentation and perk customization, offering targeted rewards based on preferences and behaviors.  
+   - Leveraging K-Means clustering, we identify distinct customer groups to design a multi-level rewards structure that aligns with individual needs.  
 
-- Counts the total number of sessions per user.
-- Finds the first and last session for each user.
-- Calculates the average session duration.
-- Determines the booking ratio, i.e., sessions where a flight or hotel was booked.
-- Computes average usage of flight and hotel discounts.
-- Tracks total page clicks and cancellations.
+2. **User Data Analysis**:  
+   - Using structured SQL queries, the project delves into customer demographics, booking habits, and travel trends.  
+   - By categorizing users based on engagement and booking activity, TravelTide gains a granular understanding of its customer base, enabling precise marketing strategies.  
 
-### 3. Flight_Data
-Evaluates flight booking trends:
+---  
 
-- Counts total flights booked per user.
-- Finds the average flight fare spent.
-- Determines the user's preferred airline.
-- Calculates average seats booked per trip.
-- Counts total checked bags.
-- Computes the average trip duration.
+## **Data Sources**  
 
-### 4. Hotel_Data
-Examines hotel stay trends:
+The project is powered by data from several key sources:  
 
-- Counts total hotels booked per user.
-- Calculates the average hotel spending per room.
-- Finds the average number of nights stayed per booking.
-- Counts total rooms booked.
+- **Users**: Includes demographics, signup information, and home locations.  
+- **Sessions**: Captures user interactions, booking activity, and engagement metrics.  
+- **Flights**: Provides insights into travel frequency, spending, and airline preferences.  
+- **Hotels**: Analyzes hotel booking behavior, spending, and duration of stays.  
+- **Engagement & Segmentation**: Focuses on calculating engagement scores and categorizing users.  
 
-### 5. Lifetime_Value
-Computes the lifetime value of each user:
+---  
 
-- Summarizes total spending on flights and hotels.
-- Uses `COALESCE` to handle missing data and ensure correct calculations.
+## **Key Features**  
 
-### 6. Travel_Frequency
-Tracks travel activity per user:
+### **Rewards Program Development**  
 
-- Counts the total number of trips taken.
-- Counts distinct active years based on session data.
+- **Customer Segmentation**:  
+   - K-Means clustering groups customers into distinct segments.  
+   - Optimal cluster count is determined using methods like the **Elbow Plot** and **Silhouette Score**.  
 
-### 7. Customer_Engagement
-Measures user engagement using a weighted score:
+- **Perk Customization**:  
+   - Identifies perks most likely to resonate with specific customer groups, such as bonus miles, discounts, or exclusive offers.  
+   - Suggests a multi-level rewards system (e.g., Silver, Gold, Platinum) to cater to varying levels of engagement and loyalty.  
 
-- Booking ratio contributes **30%** to the engagement score.
-- Total sessions contribute **40%** (normalized by the maximum total sessions).
-- Lifetime value contributes **30%** (normalized by the highest lifetime value).
-- Calculates average clicks per session.
+- **Data-Driven Recommendations**:  
+   - Provides clear, actionable steps for designing a tailored rewards program.  
+   - Encourages targeted promotions and personalized incentives to enhance customer satisfaction.  
 
-### 8. Booking_Segment
-Classifies users based on their booking activity:
+### **SQL-Based User Analysis**  
 
-- **High Bookers**: Booking ratio >= 50%.
-- **Medium Bookers**: Booking ratio between 20% and 50%.
-- **Low Bookers**: Booking ratio below 20%.
+The SQL analysis uses Common Table Expressions (CTEs) to logically structure data before generating a final user-level report. Key components include:  
 
-### 9. Travel_Engagement_Segment
-Categorizes users based on travel frequency and engagement:
+1. **User Demographics**: Extracts user details like age, gender, and home location, classifying them into meaningful categories.  
+2. **Session Behavior**: Tracks session counts, average duration, booking ratios, and cancellations.  
+3. **Flight and Hotel Trends**: Analyzes booking habits, spending, and travel preferences.  
+4. **Lifetime Value Calculation**: Aggregates total spending on flights and hotels to compute user-level lifetime value.  
+5. **Travel Frequency**: Measures trip counts and identifies active travel years.  
+6. **Customer Engagement Scoring**: Assigns an engagement score based on booking activity, session data, and lifetime value.  
+7. **User Segmentation**: Categorizes customers into High, Medium, or Low Bookers and further segments based on travel frequency and engagement.  
 
-- **Frequent High Engagers**: 10+ trips and engagement score >= 0.7.
-- **Frequent Medium Engagers**: 5+ trips and engagement score >= 0.5.
-- **Occasional Low Engagers**: Less frequent travelers with lower engagement.
+### **Final Output**  
 
-## Final Output
-The final query aggregates all the processed data and generates a user-level report, including:
+The analysis culminates in a comprehensive user-level report, summarizing:  
 
-- **User demographics and location data.**
-- **Session behavior**, including total sessions, session duration, and booking trends.
-- **Flight and hotel booking statistics.**
-- **Lifetime value estimation.**
-- **User segmentation based on engagement and booking trends.**
+- Demographics and location data.  
+- Engagement metrics, session behavior, and booking patterns.  
+- Spending trends and lifetime value.  
+- User segments based on travel and booking activity.  
 
-## Business Insights & Use Cases
-This analysis helps businesses:
+---  
 
-- Target high-value customers with personalized offers.
-- Improve engagement strategies for low-booking users.
-- Analyze travel trends to optimize services and pricing.
-- Identify potential retention risks by tracking cancellations and low engagement.
+## **Business Insights & Use Cases**  
 
-## How to Use
-### Clone this repository:
-```bash
-git clone https://github.com/jacobdempseyolson/Masteryproject/user-data-analysis.git
-```
+### **For TravelTide**  
 
+- **Targeting High-Value Customers**: Focus on high-value users with personalized incentives and rewards.  
+- **Improving Engagement**: Address low-engagement users with tailored promotions.  
+- **Optimizing Services**: Use travel trend insights to refine offerings and pricing strategies.  
+- **Identifying Retention Risks**: Track low activity and cancellations to preempt churn.  
 
-### Analyze the output and use insights for business decision-making.
+### **For Customers**  
 
-## Future Improvements
-- **Incorporate real-time data streaming** for dynamic analysis.
-- **Enhance segmentation** with machine learning models.
-- **Add additional behavioral insights** like peak booking times and seasonal trends.
+- A rewards program that evolves with their preferences and behavior.  
+- Access to perks and incentives tailored to their unique travel patterns.  
 
-## Contributors
-- **Jacob Dempsey-Olson** - Data Analyst & SQL Developer
+---  
 
+## **How to Use**  
+
+### **1. Clone the Repository**  
+
+```bash  
+# Rewards Program  
+git clone https://github.com/YourUsername/TravelTide.git  
+
+# User Data Analysis  
+git clone https://github.com/jacobdempseyolson/Masteryproject/user-data-analysis.git  
+```  
+
+### **2. Install Dependencies**  
+
+For the rewards program, install dependencies with:  
+```bash  
+pip install -r requirements.txt  
+```  
+
+For SQL analysis, use a compatible database system such as PostgreSQL or MySQL.  
+
+---  
+
+## **Future Improvements**  
+
+- Incorporate **real-time data streaming** for dynamic insights.  
+- Enhance segmentation with **machine learning models**.  
+- Add analysis of **seasonal travel trends** and peak booking times.  
+
+---  
+
+## **Contributors**  
+
+- **Jacob Dempsey-Olson**: Data Analyst & SQL Developer.  
+- **Your Name**: Rewards Program Designer & Data Scientist.  
+
+---  
+
+This project delivers a robust combination of advanced analytics and customer segmentation, laying the groundwork for a data-driven rewards program that fosters loyalty and satisfaction.
