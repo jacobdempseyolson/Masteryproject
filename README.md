@@ -1,123 +1,96 @@
+# TravelTide Rewards Program & User Data Analysis
 
+Welcome to the **TravelTide Rewards Program & User Data Analysis** repository. This project combines advanced data analysis techniques and personalized rewards strategies to enhance customer engagement, drive loyalty, and improve marketing strategies. By leveraging customer segmentation and SQL-based user analysis, we gain insights into customer behavior, engagement, and travel patterns, laying the foundation for a targeted rewards program.
 
-# **TravelTide Rewards Program & User Data Analysis**  
+## Project Overview
 
-Welcome to the **TravelTide Rewards Program & User Data Analysis** repository. This project leverages advanced data analysis techniques to support the creation of a personalized rewards program while providing deep insights into customer behavior, engagement, and travel patterns. By integrating customer segmentation and SQL-based user analysis, the initiative delivers actionable insights to enhance marketing strategies, improve customer engagement, and drive loyalty.  
+This repository includes two key initiatives for **TravelTide**:
 
----  
+### 1. **Rewards Program Development**
+- The rewards program aims to offer personalized rewards based on customer preferences and behavior.
+- Using **K-Means clustering**, distinct customer groups are identified, and perks are tailored to these segments.
+- The rewards structure is designed with multiple tiers (e.g., **Silver**, **Gold**, **Platinum**) based on customer engagement and loyalty levels.
 
-## **Project Overview**  
+### 2. **User Data Analysis**
+- The project uses structured SQL queries to analyze customer demographics, travel habits, booking preferences, and engagement metrics.
+- Users are segmented based on booking activity, session data, and lifetime value, enabling highly targeted marketing strategies.
 
-This repository combines two critical initiatives for TravelTide:  
+## Data Sources
 
-1. **Rewards Program Development**:  
-   - The rewards program focuses on customer segmentation and perk customization, offering targeted rewards based on preferences and behaviors.  
-   - Leveraging K-Means clustering, we identify distinct customer groups to design a multi-level rewards structure that aligns with individual needs.  
+The data used in this project comes from several key sources:
 
-2. **User Data Analysis**:  
-   - Using structured SQL queries, the project delves into customer demographics, booking habits, and travel trends.  
-   - By categorizing users based on engagement and booking activity, TravelTide gains a granular understanding of its customer base, enabling precise marketing strategies.  
+- **Users**: Demographics, sign-up information, and home locations.
+- **Sessions**: Tracks user interactions, booking activities, and engagement metrics.
+- **Flights**: Insights into travel frequency, spending, and airline preferences.
+- **Hotels**: Analyzes hotel booking patterns, spending, and stay duration.
+- **Engagement & Segmentation**: Calculating engagement scores and categorizing users based on behavior.
 
----  
+## Key Features
 
-## **Data Sources**  
+### **Rewards Program Development**
+- **Customer Segmentation**: K-Means clustering is used to group customers into distinct segments. 
+  - Optimal cluster count is determined with the **Elbow Plot** and **Silhouette Score**.
+- **Perk Customization**: Based on customer group preferences, perks like bonus miles, discounts, and exclusive offers are customized.
+  - A multi-level rewards system is proposed, offering Silver, Gold, and Platinum status with varying perks.
+- **Data-Driven Recommendations**: Actionable steps to design a personalized rewards program that boosts customer satisfaction and loyalty.
 
-The project is powered by data from several key sources:  
+### **SQL-Based User Analysis**
+The SQL analysis generates insights into customer behavior, with several key analyses performed:
+- **User Demographics**: Age, gender, and location data.
+- **Session Behavior**: Session counts, durations, booking ratios, and cancellations.
+- **Flight and Hotel Trends**: Booking habits, spending, and travel preferences.
+- **Lifetime Value Calculation**: Total spending on flights and hotels.
+- **Travel Frequency**: Measures trip counts and active travel years.
+- **Customer Engagement Scoring**: Engagement score based on booking activity and lifetime value.
+- **User Segmentation**: Categorizes customers into High, Medium, or Low Bookers based on engagement and frequency.
 
-- **Users**: Includes demographics, signup information, and home locations.  
-- **Sessions**: Captures user interactions, booking activity, and engagement metrics.  
-- **Flights**: Provides insights into travel frequency, spending, and airline preferences.  
-- **Hotels**: Analyzes hotel booking behavior, spending, and duration of stays.  
-- **Engagement & Segmentation**: Focuses on calculating engagement scores and categorizing users.  
+### **Customer Segments & Rewards Program Tiers**
 
----  
+Using the user data analysis, customers are categorized into the following segments with corresponding rewards program tiers:
 
-## **Key Features**  
+1. **Business Traveler**
+   - **Platinum**: First Class Lounge Access, Free Airport to Hotel Transport, Priority Boarding, VIP Concierge Service
+   - **Gold**: Priority Boarding, Free Hotel with Flight, Free Checked Bags
+   - **Silver**: Priority Boarding, Free Hotel with Flight, Free Checked Bags
+   - **Bronze**: Priority Boarding, Free Checked Bags
 
-### **Rewards Program Development**  
+2. **Family Traveler**
+   - **Platinum**: First Class Lounge, Free Airport to Hotel Transport, Kids Stay Free, Family Vacation Planning Service
+   - **Gold**: Kids Stay Free, Family Vacation Planning Service, Free Hotel with Flight
+   - **Silver**: Kids Stay Free, Free Hotel with Flight
+   - **Bronze**: Kids Stay Free, Free Checked Bags
 
-- **Customer Segmentation**:  
-   - K-Means clustering groups customers into distinct segments.  
-   - Optimal cluster count is determined using methods like the **Elbow Plot** and **Silhouette Score**.  
+3. **Dreamers**
+   - **Platinum**: First Class Lounge Access, First Booking Discount, Priority Boarding, Exclusive Offers
+   - **Gold**: First Booking Discount, Free Hotel with Flight, Priority Boarding
+   - **Silver**: First Booking Discount, Free Hotel with Flight
+   - **Bronze**: First Booking Discount, Free Checked Bags
 
-- **Perk Customization**:  
-   - Identifies perks most likely to resonate with specific customer groups, such as bonus miles, discounts, or exclusive offers.  
-   - Suggests a multi-level rewards system (e.g., Silver, Gold, Platinum) to cater to varying levels of engagement and loyalty.  
+4. **Young Singles**
+   - **Platinum**: First Class Lounge Access, Weekend Getaway Bonuses, Free Upgrade on Selected Flights
+   - **Gold**: Weekend Getaway Bonuses, Free Hotel with Flight, Priority Boarding
+   - **Silver**: Weekend Getaway Bonuses, Free Hotel with Flight
+   - **Bronze**: Weekend Getaway Bonuses, Free Checked Bags
 
-- **Data-Driven Recommendations**:  
-   - Provides clear, actionable steps for designing a tailored rewards program.  
-   - Encourages targeted promotions and personalized incentives to enhance customer satisfaction.  
+5. **Senior / Retired Traveler**
+   - **Platinum**: First Class Lounge Access, Senior Discounts, Free Airport to Hotel Transport, Priority Boarding
+   - **Gold**: Senior Discounts, Free Hotel with Flight, Priority Boarding
+   - **Silver**: Senior Discounts, Free Hotel with Flight
+   - **Bronze**: Senior Discounts, Free Checked Bags
 
-### **SQL-Based User Analysis**  
+6. **High Spender**
+   - **Platinum**: First Class Lounge, Luxury Lounge Access, Suite Upgrade (Subject to Availability), Free Hotel with Flight
+   - **Gold**: Luxury Lounge Access, Free Hotel with Flight
+   - **Silver**: Luxury Lounge Access, Free Hotel with Flight
+   - **Bronze**: Luxury Lounge Access, Free Checked Bags
 
-The SQL analysis uses Common Table Expressions (CTEs) to logically structure data before generating a final user-level report. Key components include:  
+### **Summary of Platinum Status Perks**:
+Platinum status includes all Gold and Silver benefits with premium upgrades such as **First Class Lounge Access**, **Free Transportation**, and **Exclusive Upgrades** tailored to each customer type. This provides the highest level of convenience and luxury for frequent travelers.
 
-1. **User Demographics**: Extracts user details like age, gender, and home location, classifying them into meaningful categories.  
-2. **Session Behavior**: Tracks session counts, average duration, booking ratios, and cancellations.  
-3. **Flight and Hotel Trends**: Analyzes booking habits, spending, and travel preferences.  
-4. **Lifetime Value Calculation**: Aggregates total spending on flights and hotels to compute user-level lifetime value.  
-5. **Travel Frequency**: Measures trip counts and identifies active travel years.  
-6. **Customer Engagement Scoring**: Assigns an engagement score based on booking activity, session data, and lifetime value.  
-7. **User Segmentation**: Categorizes customers into High, Medium, or Low Bookers and further segments based on travel frequency and engagement.  
+---
 
-### **Final Output**  
+## How to Use
 
-The analysis culminates in a comprehensive user-level report, summarizing:  
-
-- Demographics and location data.  
-- Engagement metrics, session behavior, and booking patterns.  
-- Spending trends and lifetime value.  
-- User segments based on travel and booking activity.  
-
----  
-
-## **Business Insights & Use Cases**  
-
-### **For TravelTide**  
-
-- **Targeting High-Value Customers**: Focus on high-value users with personalized incentives and rewards.  
-- **Improving Engagement**: Address low-engagement users with tailored promotions.  
-- **Optimizing Services**: Use travel trend insights to refine offerings and pricing strategies.  
-- **Identifying Retention Risks**: Track low activity and cancellations to preempt churn.  
-
-### **For Customers**  
-
-- A rewards program that evolves with their preferences and behavior.  
-- Access to perks and incentives tailored to their unique travel patterns.  
-
----  
-
-## **How to Use**  
-
-
-# User Data Analysis  
-git clone https://github.com/jacobdempseyolson/Masteryproject/user-data-analysis.git  
-```  
-
-### **2. Install Dependencies**  
-
-For the rewards program, install dependencies with:  
-```bash  
-pip install -r requirements.txt  
-```  
-
-For SQL analysis, use a compatible database system such as PostgreSQL or MySQL.  
-
----  
-
-## **Future Improvements**  
-
-- Incorporate **real-time data streaming** for dynamic insights.  
-- Enhance segmentation with **machine learning models**.  
-- Add analysis of **seasonal travel trends** and peak booking times.  
-
----  
-
-## **Contributors**  
-
-- **Jacob Dempsey-Olson**: Data Analyst & SQL Developer.  
-- **Your Name**: Rewards Program Designer & Data Scientist.  
-
----  
-
-This project delivers a robust combination of advanced analytics and customer segmentation, laying the groundwork for a data-driven rewards program that fosters loyalty and satisfaction.
+### 1. Clone the Repository
+```bash
+git clone https://github.com/jacobdempseyolson/Masteryproject/user-data-analysis.git
