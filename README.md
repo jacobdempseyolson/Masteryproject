@@ -89,11 +89,6 @@ The analysis culminates in a comprehensive user-level report, summarizing:
 
 ## **How to Use**  
 
-### **1. Clone the Repository**  
-
-```bash  
-# Rewards Program  
-git clone https://github.com/YourUsername/TravelTide.git  
 
 # User Data Analysis  
 git clone https://github.com/jacobdempseyolson/Masteryproject/user-data-analysis.git  
