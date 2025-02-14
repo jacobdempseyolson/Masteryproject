@@ -1,6 +1,5 @@
 WITH Haversine_Distance AS (
     -- Calculates the distance (in kilometers) between users' home airport and destination airport
-    -- using the Haversine formula.
     SELECT 
         s.user_id,
         f.trip_id,
@@ -17,9 +16,7 @@ WITH Haversine_Distance AS (
     JOIN flights f ON s.trip_id = f.trip_id
 ),
 User_Details AS (
-    -- Collects demographic and personal information about users, including age, marital status, 
-    -- number of children, and their geographical location. Also classifies users into age groups 
-    -- and segments (Urban, Suburban, Rural, Unclassified) based on their city.
+    -- Collects demographic and personal information about users
     SELECT 
         u.user_id,
         u.gender,
@@ -41,9 +38,21 @@ User_Details AS (
         u.home_airport_lat,
         u.home_airport_lon,
         CASE 
-            WHEN LOWER(u.home_city) IN (...) THEN 'Urban'
-            WHEN LOWER(u.home_city) IN (...) THEN 'Suburban'
-            WHEN LOWER(u.home_city) IN (...) THEN 'Rural'
+            WHEN LOWER(u.home_city) IN ('akron', 'anchorage', 'atlanta', 'austin', 'baltimore', 'boston', 'calgary', 'charlotte', 
+                                        'chicago', 'cincinnati', 'cleveland', 'columbus', 'dallas', 'denver', 'detroit', 'edmonton', 
+                                        'fort worth', 'fresno', 'honolulu', 'houston', 'indianapolis', 'jacksonville', 'kansas city', 
+                                        'las vegas', 'los angeles', 'louisville', 'memphis', 'miami', 'milwaukee', 'minneapolis', 
+                                        'montreal', 'nashville', 'new orleans', 'new york', 'newark', 'oakland', 'oklahoma city', 
+                                        'orlando', 'ottawa', 'philadelphia', 'phoenix', 'portland', 'providence', 'quebec', 'richmond', 
+                                        'sacramento', 'salt lake city', 'san antonio', 'san diego', 'san francisco', 'san jose', 
+                                        'seattle', 'tampa', 'toronto', 'vancouver', 'washington') THEN 'Urban'
+            WHEN LOWER(u.home_city) IN ('amarillo', 'bakersfield', 'baton rouge', 'birmingham', 'buffalo', 'burlington', 'colorado springs', 
+                                        'corpus christi', 'des moines', 'el paso', 'fayetteville', 'grand rapids', 'halifax', 'hamilton', 
+                                        'laredo', 'lincoln', 'little rock', 'long beach', 'lubbock', 'madison', 'mobile', 'modesto', 
+                                        'montgomery', 'newport news', 'norfolk', 'omaha', 'reno', 'riverside', 'rochester', 'shreveport', 
+                                        'spokane', 'st. louis', 'stockton', 'tacoma', 'tallahassee', 'tucson', 'tulsa', 'victoria', 
+                                        'wichita', 'windsor', 'winston-salem') THEN 'Suburban'
+            WHEN LOWER(u.home_city) IN ('brownsville', 'gatineau', 'saskatoon', 'st. petersburg', 'winnipeg', 'london') THEN 'Rural'
             ELSE 'Unclassified'
         END AS customer_segment
     FROM users u
@@ -59,8 +68,7 @@ Filtered_Sessions AS (
     HAVING COUNT(s.session_id) > 7
 ),
 Flight_Hotel_Data AS (
-    -- Aggregates data on users' flight and hotel activities, such as the number of flights,
-    -- the number of hotels booked, average nights stayed, and other trip-related metrics.
+    -- Aggregates data on users' flight and hotel activities
     SELECT 
         s.user_id,
         COUNT(DISTINCT f.trip_id) AS total_flights,
@@ -79,8 +87,7 @@ Flight_Hotel_Data AS (
     GROUP BY s.user_id
 ),
 Travel_Frequency AS (
-    -- Determines the number of trips taken by users and how many active years they have been traveling,
-    -- based on their session history.
+    -- Determines the number of trips taken by users and their active years
     SELECT 
         s.user_id,
         COUNT(DISTINCT s.trip_id) AS total_trips,
@@ -91,9 +98,7 @@ Travel_Frequency AS (
     GROUP BY s.user_id
 ),
 Customer_Segmentation AS (
-    -- Segments users into categories (e.g., Family Traveler, Business Traveler, Dreamer, etc.)
-    -- based on their travel and spending behaviors, using metrics like the number of flights, hotels,
-    -- and the type of trips taken.
+    -- Segments users into categories based on travel behaviors
     SELECT 
         fh.user_id,
         CASE 
@@ -123,7 +128,7 @@ Customer_Segmentation AS (
     JOIN Travel_Frequency tf ON ud.user_id = tf.user_id
 ),
 Customer_Spending AS (
-    -- Calculates total spending for each user, including both flight and hotel spending.
+    -- Calculates total spending for each user
     SELECT 
         s.user_id,
         COALESCE(SUM(f.base_fare_usd), 0) + COALESCE(SUM(h.hotel_per_room_usd * h.nights * h.rooms), 0) AS total_spending
@@ -134,7 +139,7 @@ Customer_Spending AS (
     GROUP BY s.user_id
 ),
 Average_Spending AS (
-    -- Calculates the average spending for each customer type.
+    -- Calculates the average spending for each customer type
     SELECT 
         customer_type,
         AVG(total_spending) AS avg_spending
@@ -143,52 +148,49 @@ Average_Spending AS (
     GROUP BY customer_type
 ),
 Customer_Status AS (
-    -- Assigns a "Gold", "Silver", or "Bronze" status to each user based on their total spending compared 
-    -- to the average spending for their customer type.
+    -- Assigns a "Gold", "Silver", or "Bronze" status based on spending
     SELECT 
         cs.user_id,
         cs2.customer_type,
         cs.total_spending,
         CASE 
-            WHEN cs.total_spending >= avg.avg_spending * 1.5 THEN 'Gold'
-            WHEN cs.total_spending >= avg.avg_spending THEN 'Silver'
-            ELSE 'Bronze'
+            WHEN cs.total_spending >= avg.avg_spending * 1.5 THEN 'Platinum'
+            WHEN cs.total_spending >= avg.avg_spending THEN 'Gold'
+            ELSE 'Silver'
         END AS status
     FROM Customer_Spending cs
     INNER JOIN Customer_Segmentation cs2 ON cs.user_id = cs2.user_id
     INNER JOIN Average_Spending avg ON cs2.customer_type = avg.customer_type
 ),
 Rewards_Allocation AS (
-    -- Allocates specific rewards (perks) to each user based on their customer type and status.
+    -- Allocates rewards based on customer type and status
     SELECT 
         cs.user_id,
         cs2.customer_type,
         cs.status,
         CASE 
+            WHEN cs.status = 'Platinum' THEN ARRAY[
+                'First Class Lounge Access', 
+                'Free Airport to Hotel Transport', 
+                'Priority Boarding', 
+                'VIP Concierge Service', 
+                'Exclusive Offers', 
+                'Luxury Suite Upgrade (Subject to Availability)'
+            ]
             WHEN cs.status = 'Gold' THEN ARRAY[
-                CASE 
-                    WHEN cs2.customer_type = 'Business Traveler' THEN 'Priority Boarding'
-                    WHEN cs2.customer_type = 'Family Traveler' THEN 'Kids Stay Free'
-                    WHEN cs2.customer_type = 'Dreamers' THEN 'First Booking Discount'
-                    WHEN cs2.customer_type = 'Young Singles' THEN 'Weekend Getaway Bonuses'
-                END,
-                '1 Night Free Hotel with Flight',
-                'Free Checked Bags'
+                'Priority Boarding', 
+                'Free Hotel with Flight', 
+                'Free Checked Bags', 
+                'Kids Stay Free', 
+                'Family Vacation Planning Service'
             ]
             WHEN cs.status = 'Silver' THEN ARRAY[
-                CASE 
-                    WHEN cs2.customer_type = 'Business Traveler' THEN 'Priority Boarding'
-                    WHEN cs2.customer_type = 'Family Traveler' THEN 'Kids Stay Free'
-                    WHEN cs2.customer_type = 'Dreamers' THEN 'First Booking Discount'
-                END,
-                '1 Night Free Hotel with Flight'
+                'Free Hotel with Flight', 
+                'First Booking Discount', 
+                'Weekend Getaway Bonuses'
             ]
             ELSE ARRAY[
-                CASE 
-                    WHEN cs2.customer_type = 'Business Traveler' THEN 'Priority Boarding'
-                    WHEN cs2.customer_type = 'Family Traveler' THEN 'Kids Stay Free'
-                    WHEN cs2.customer_type = 'Dreamers' THEN 'First Booking Discount'
-                END
+                'Free Checked Bags'
             ]
         END AS perks
     FROM Customer_Status cs
@@ -209,3 +211,5 @@ JOIN Customer_Segmentation cs2 ON ud.user_id = cs2.user_id
 JOIN Customer_Status cs_status ON ud.user_id = cs_status.user_id
 JOIN Rewards_Allocation ra ON ud.user_id = ra.user_id
 ORDER BY cs2.customer_type, cs_status.status DESC, ud.user_id;
+
+
