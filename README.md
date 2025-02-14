@@ -89,8 +89,4 @@ Platinum status includes all Gold and Silver benefits with premium upgrades such
 
 ---
 
-## How to Use
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/jacobdempseyolson/Masteryproject/user-data-analysis.git
